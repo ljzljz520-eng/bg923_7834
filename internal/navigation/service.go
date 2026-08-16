@@ -5,6 +5,9 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+
+	"golang.org/x/text/collate"
+	"golang.org/x/text/language"
 )
 
 type Service struct {
@@ -56,8 +59,15 @@ func (s *Service) Groups() []string {
 
 func (s *Service) List(group string) []Link {
 	links := s.store.list(group)
-	sort.Slice(links, func(i, j int) bool {
-		return links[i].SortOrder < links[j].SortOrder
+	// Order by sort value first, then by title using Chinese (pinyin)
+	// collation so links with equal sort values keep a stable, localized order
+	// instead of drifting with import order.
+	titleCollator := collate.New(language.SimplifiedChinese)
+	sort.SliceStable(links, func(i, j int) bool {
+		if links[i].SortOrder != links[j].SortOrder {
+			return links[i].SortOrder < links[j].SortOrder
+		}
+		return titleCollator.CompareString(links[i].Title, links[j].Title) < 0
 	})
 	return links
 }
